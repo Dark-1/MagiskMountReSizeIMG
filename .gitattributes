@@ -1,0 +1,6 @@
+# Declare file(s) that will always have LF line ending.
+
+META-INF/** text eol=lf
+config.sh text eol=lf
+README.md text eol=lf
+LICENSE text eol=lf
