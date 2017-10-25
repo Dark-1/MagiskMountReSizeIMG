@@ -30,6 +30,7 @@ if $BOOTMODE; then
   MOUNTPATH=/dev/magisk_merge
   IMG=/data/magisk_merge.img
 fi
+
 MRIDIR=$TMPDIR/mridir
 MAGISKBIN=/data/magisk
 
@@ -38,6 +39,7 @@ umask 022
 
 # Initial cleanup
 rm -rf $TMPDIR 2>/dev/null
+
 mkdir -p $MRIDIR
 
 ##########################################################################################
@@ -106,6 +108,7 @@ $BOOTMODE && boot_actions || recovery_actions
 DeBugInfo=false
 
 # Extract configurations file
+
 unzip -o "$ZIP" config.sh -d $MRIDIR 2>/dev/null
 [ ! -f $MRIDIR/config.sh ] && abort "!!! Unable to extract zip file!"
 
