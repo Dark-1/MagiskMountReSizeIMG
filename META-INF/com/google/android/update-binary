@@ -30,7 +30,7 @@ if $BOOTMODE; then
   MOUNTPATH=/dev/magisk_merge
   IMG=/data/magisk_merge.img
 fi
-MOUNTDIR=$TMPDIR/mountdir
+MRIDIR=$TMPDIR/mridir
 MAGISKBIN=/data/magisk
 
 # Default permissions
@@ -38,7 +38,7 @@ umask 022
 
 # Initial cleanup
 rm -rf $TMPDIR 2>/dev/null
-mkdir -p $MOUNTDIR
+mkdir -p $MRIDIR
 
 ##########################################################################################
 # Flashable update-binary preparation
@@ -106,44 +106,20 @@ $BOOTMODE && boot_actions || recovery_actions
 DeBugInfo=false
 
 # Extract configurations file
-unzip -o "$ZIP" config.sh -d $MOUNTDIR 2>/dev/null
-[ ! -f $MOUNTDIR/config.sh ] && abort "!!! Unable to extract zip file!"
+unzip -o "$ZIP" config.sh -d $MRIDIR 2>/dev/null
+[ ! -f $MRIDIR/config.sh ] && abort "!!! Unable to extract zip file!"
 
 # Load configurations
-. $MOUNTDIR/config.sh
+. $MRIDIR/config.sh
 
 ###########################################
 ## Function's                            ##
 ###########################################
 
-# Magic of UnMounting is Here
-# Study Well ;-) B-)
-umount_image() 
-{
-  local PATHMOUNT=$1
-  local CHKIMG=$2
-  local DEVLOOP=`mount | grep " $PATHMOUNT " | head -n 1 | cut -c -16`
-  local CHKLOOP=`losetup -a | grep "$CHKIMG" | head -n 1 | cut -c -16`
-  if [ $DEVLOOP = $CHKLOOP ];
-  then
-    $MAGISKBIN/magisk --umountimg $PATHMOUNT $DEVLOOP
-    rmdir $PATHMOUNT
-    if ! is_mounted $PATHMOUNT;
-    then
-      ui_print "- UnMounting \"$PATHMOUNT\""
-      ui_print "- Detaching \"$DEVLOOP\" from \"$CHKIMG\""
-    else
-      ui_print "! UnMounting \"$PATHMOUNT\" Failed"
-    fi
-  else
-     ui_print "! Loop Device \"$DEVLOOP\" is Not Equal To \"$CHKLOOP\"!"
-     ui_print "! Hence UnMounting \"$PATHMOUNT\" Failed"
-  fi
-}
-
 # ReSize Mode
 image_resize()
 {
+  $DeBugInfo && ui_print "- Start of Fn image_resize"
   local ReSizeIMG=$1
   local ReSizeMode=$2
   local ReSizeUserMB=$3
@@ -157,11 +133,13 @@ image_resize()
         # Just InFo for Magisk IMG
         ui_print "- In \"$ReSizeMode\" ReSizeMode"
         image_size_check $ReSizeIMG
+        ui_print "- ----"
         ui_print "- InFo for Magisk IMG \"$ReSizeIMG\""
         ui_print "- Free  Size = $curFreeM M"
         ui_print "- Used  Size = $curUsedM M"
         ui_print "- Total Size = $curSizeM M"
         ui_print "- NOTE : This are Current Values"
+        ui_print "- ----"
       ;;
     1 )
         # ReSize to Default 64M OR MoRe Depending on Current Used Size
@@ -170,6 +148,7 @@ image_resize()
         local MinSize=$((curUsedM / 32 * 32 + 64))
         ui_print "- ReSizeing \"$ReSizeIMG\" to ${MinSize} M "
         $MAGISKBIN/magisk --resizeimg $ReSizeIMG $MinSize
+        $DeBugInfo && ui_print "- Done ReSizeIMG'ing"
       ;;
     2 )
         # ReSize to User Spicified Size BUT NOT less than 64M OR Current Used Size
@@ -188,6 +167,7 @@ image_resize()
           ui_print "! Hence!... Abort"
           exit 1
         fi
+        $DeBugInfo && ui_print "- Done ReSizeIMG'ing"
       ;;
     3 )
         # ReSize to Current Size + User Spicified Size BUT Total is NOT less than 64M OR Current Used Size
@@ -209,13 +189,16 @@ image_resize()
           ui_print "! Hence!... Abort"
           exit 1
         fi
+        $DeBugInfo && ui_print "- Done ReSizeIMG'ing"
       ;;
     * )
         # Default if NoNe of Above
         ui_print "- Wrong InPut > \"$ReSizeMode\""
         ui_print "- Hence ReSizeing \"$ReSizeIMG\" Skipped"
+        $DeBugInfo && ui_print "- Done DeFault Display"
       ;;
   esac
+  $DeBugInfo && ui_print "- End of Fn image_resize"
 }
 
 # DeBug Info
@@ -224,13 +207,18 @@ print_db_info()
   ui_print " "
   ui_print "*******************************"
   ui_print "!!!#      DeBug InFo      #!!! "
-  ui_print "0> DeBugInfo == $DeBugInfo "
-  ui_print "1> MTSW ======= $MTSW "
-  ui_print "2> MTRSMO ===== $MTRSMO "
-  ui_print "3> MTRSMB ===== $MTRSMB "
-  ui_print "4> UTSW ======= $UTSW "
-  ui_print "5> UTRSMO ===== $UTRSMO "
-  ui_print "6> UTRSMB ===== $UTRSMB "
+  ui_print "!> DeBugInfo == $DeBugInfo "
+  ui_print "!> MTSW ======= $MTSW "
+  ui_print "!> MTRSMO ===== $MTRSMO "
+  ui_print "!> MTRSMB ===== $MTRSMB "
+  ui_print "!> UTSW ======= $UTSW "
+  ui_print "!> UTRSMO ===== $UTRSMO "
+  ui_print "!> UTRSMB ===== $UTRSMB "
+  ui_print "!> RSOSW ====== $RSOSW "
+  ui_print "!> RSOMO ====== $RSOMO "
+  ui_print "!> RSOMB ====== $RSOMB "
+  is_mounted $MOUNTPATH && ui_print "!> Mounted \"$MOUNTPATH\""
+  is_mounted $MOUNTPATH || ui_print "!> UnMounted \"$MOUNTPATH\""
   ui_print "*******************************"
 }
 
@@ -254,76 +242,74 @@ print_msg
 $DeBugInfo && print_db_info
 ui_print " "
 
-# Magic to Mount Or UnMount of the Script is Here
-# Study Well :-P  B-)
-if ! is_mounted $MOUNTPATH; 
+
+# Magic of the Script to Mount Or UnMount Or Skip both and just ReSize is Here
+# Study Well :P  B)
+
+# ReSize Only IMG Mode
+if $RSOSW ; 
 then
-  ui_print "- Magisk Mount IMG Mode"
-  image_resize $IMG $MTRSMO $MTRSMB
-  ui_print "- Mounting $IMG to $MOUNTPATH"
-  local MAGISKLOOP=`$MAGISKBIN/magisk --mountimg $IMG $MOUNTPATH`
-  is_mounted $MOUNTPATH || abort "! \"$IMG\" mount failed..."
-  ui_print "- \"$IMG\" Mounted on DevLoop = $MAGISKLOOP"
-else
-  ui_print "- Magisk UnMount IMG Mode"
-  umount_image $MOUNTPATH $IMG
-  # Check if Still Mount'ed
-  if is_mounted $MOUNTPATH; 
-  then
-    ui_print "! \"$IMG\" Unmount Failed!... Abort"
-    exit 1
-  fi
-  image_resize $IMG $UTRSMO $UTRSMB
-fi
-
-
-
-# Magic to Mount Or UnMount of the Script is Here
-# Study Well :-P  B-)
-
-# 
-if [ $ROSW ];
-then
-  ui_print "- Magisk ReSize Only IMG Mode"
-  if is_mounted $MOUNTPATH; 
+  ui_print "- Magisk ReSize Only IMG Mode [RSOSW]"
+  if is_mounted $MOUNTPATH ; 
   then
     ui_print "! \"$IMG\" Mounted Hence UnMounting to ReSize"
-    umount_image $MOUNTPATH $IMG
+    local DEVLOOP=`cat /proc/mounts | grep " $MOUNTPATH " | head -n 1 | cut -c -16`
+    $DeBugInfo && ui_print "- Detaching \"$DEVLOOP\""
+    $MAGISKBIN/magisk --umountimg $MOUNTPATH $DEVLOOP
     # Check if Still Mount'ed
     is_mounted $MOUNTPATH && abort "! \"$IMG\" Unmount Failed!..."
+    rmdir $MOUNTPATH
+    $DeBugInfo && ui_print "- UnMounted $MOUNTPATH"
+    $DeBugInfo && ui_print "- from $IMG & $DEVLOOP"
   fi
-  image_resize $IMG $RSMO $RSMB
+  image_resize $IMG $RSOMO $RSOMB
+  $DeBugInfo && ui_print "- Done ReSize Only Mode"
   
-elif [ ! is_mounted $MOUNTPATH && $MTSW ] ; 
+# Mount IMG Mode
+elif $MTSW && ! is_mounted $MOUNTPATH ; 
 then
-  ui_print "- Magisk Mount IMG Mode"
+  ui_print "- Magisk Mount IMG Mode [MTSW]"
   image_resize $IMG $MTRSMO $MTRSMB
   ui_print "- Mounting $IMG to $MOUNTPATH"
   local MAGISKLOOP=`$MAGISKBIN/magisk --mountimg $IMG $MOUNTPATH`
-  is_mounted $MOUNTPATH || abort "! \"$IMG\" Mount failed..."
+  # Check if Not Mount'ed
+  is_mounted $MOUNTPATH || abort "! \"$IMG\" Mount on \"$MAGISKLOOP\" failed..."
   ui_print "- \"$IMG\" Mounted on DevLoop = $MAGISKLOOP"
+  $DeBugInfo && ui_print "- Done Mount IMG Mode"
   
-elif [ is_mounted $MOUNTPATH && $UTSW ] ; 
+# UnMount IMG Mode
+elif $UTSW && is_mounted $MOUNTPATH ; 
 then
-  ui_print "- Magisk UnMount IMG Mode"
-  umount_image $MOUNTPATH $IMG
+  ui_print "- Magisk UnMount IMG Mode [UTSW]"
+  ui_print "- UnMounting $MOUNTPATH from $IMG"
+  local DEVLOOP=`cat /proc/mounts | grep " $MOUNTPATH " | head -n 1 | cut -c -16`
+  ui_print "- Detaching \"$DEVLOOP\""
+  $MAGISKBIN/magisk --umountimg $MOUNTPATH $DEVLOOP
   # Check if Still Mount'ed
   is_mounted $MOUNTPATH && abort "! \"$IMG\" Unmount Failed!..."
+  rmdir $MOUNTPATH
+  ui_print "- UnMounted $MOUNTPATH"
+  ui_print "- from $IMG & $DEVLOOP"
   image_resize $IMG $UTRSMO $UTRSMB
+  $DeBugInfo && ui_print "- Done UnMount IMG Mode"
   
+# Do NoThing Mode :P
 else
-  ui_print "! WhY DiD U FlAsH ThIs ZiP ??? :x "
+  ui_print "! NoThIng DoNe   |-_-|   !"
+  is_mounted $MOUNTPATH && ui_print "! Already Mounted \"$MOUNTPATH\"" || ui_print "! Already UnMounted \"$MOUNTPATH\""
+  $RSOSW && ui_print "! Not EXE ReSizeOnly[RSOSW]" || ui_print "! Not Config ReSizeOnly[RSOSW]"
+  $MTSW && ui_print "! Not EXE Mount[MTSW]" || ui_print "! Not Config Mount[MTSW]"
+  $UTSW && ui_print "! Not EXE UnMount[UTSW]" || ui_print "! Not Config UnMount[UTSW]"
+  ui_print "- Hmm ... TiMe WaStEd  :< "
+  ui_print "- Ether U 0r I m DrUnK :x "
 fi
-
-
-
 
 ##########################################################################################
 # Finalizing
 ##########################################################################################
-
+$DeBugInfo && ui_print "- Finalizing ..."
 $BOOTMODE || recovery_cleanup
+$DeBugInfo && ui_print "- Before ReMove $TMPDIR"
 rm -rf $TMPDIR
-
 ui_print "- Done"
 exit 0

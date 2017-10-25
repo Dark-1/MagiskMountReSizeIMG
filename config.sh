@@ -80,13 +80,13 @@ UTRSMB=64
 # 
 
 # UnMount Switch , ROSW , If true then will OverWrite MTSW & UTSW , Hence Default is false
-ROSW=false
+RSOSW=false
 
 # ReSizeMODE , ROMO
-RSMO=0
+RSOMO=0
 
 # User Specified Size , ROMB
-RSMB=64
+RSOMB=64
 
 ###############################################
 

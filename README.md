@@ -180,4 +180,11 @@ Thanks **topjohnwu** for Magisk & for the code in "magisk-module-template" , cou
 - Removed Un-Necessary part of Code.  
 - Removed Un-Necessary Directory(s) & File(s).  
    
+#### v2.0 ####  
+- Yea! Jump in Version.  
+- Updated `update-binary`.  
+- Fix a Critical Bug due to Duplicate Code.  
+- Optimized the Code.  
+- Added some Checks.  
+   
 .
